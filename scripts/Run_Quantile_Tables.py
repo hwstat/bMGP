@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Quantile-functional coverage tables (Section 4.3): QMP vs bagged QMP over
-# one sweep produces the q = 0.5, 0.75 and 0.95 tables; the q = 0.75 rows at
+# Quantile-functional coverage tables (Section 4.2): QMP vs bagged QMP over
+# one sweep produces the q = 0.5 and 0.75 tables (Tables 4 and 5); the q = 0.75 rows at
 # n = 1000, 2000 are the same script with --n-grid 1000 2000 (long runtimes).
 # Usage: python Run_Quantile_Tables.py [--n-grid 100 200 500 --out DIR]
 
@@ -17,12 +17,12 @@ DEFAULT_CHUNK = {100: 10, 200: 10, 500: 5, 1000: 2, 2000: 1}
 
 def parse_args():
     parser = sweep.build_parser(
-        description=("Run the bQMP quantile sweep for n in {100, 200, 500}. "
+        description=("Run the bQMP quantile sweep for n in {100, 200, 500, 1000, 2000}. "
                      "Only these sample sizes are supported."),
         default_rep_chunk_size=sweep.DEFAULT_REP_CHUNK_SIZE,
     )
     parser.add_argument(
-        "--n-grid", type=int, nargs="+", default=list(ALLOWED_N),
+        "--n-grid", type=int, nargs="+", default=[100, 200, 500],
         help="sample sizes to run",
     )
     parser.add_argument(

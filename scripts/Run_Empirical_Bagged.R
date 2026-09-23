@@ -534,461 +534,6 @@ redraw_double_bootstrap_contours_from_saved <- function(
   invisible(out)
 }
 
-generate_pseudo_sample_from_bagged_draws <- function(X_obs,
-                                                     beta_draws,
-                                                     var_draws,
-                                                     n_rep,
-                                                     error = c("gaussian", "student_t"),
-                                                     df = 5,
-                                                     seed = 1234) {
-  error <- match.arg(error)
-  set.seed(seed)
-
-  n_obs <- nrow(X_obs)
-  p <- ncol(X_obs)
-  draw_idx <- sample.int(nrow(beta_draws), size = 1)
-  beta_draw <- as.numeric(beta_draws[draw_idx, ])
-  var_draw <- max(as.numeric(var_draws[draw_idx]), 1e-8)
-
-  idx_seq <- sample.int(n_obs, size = n_rep, replace = TRUE)
-  X_rep <- X_obs[idx_seq, , drop = FALSE]
-  colnames(X_rep) <- colnames(X_obs)
-  eps <- switch(
-    error,
-    gaussian = rnorm(n_rep),
-    student_t = rt(n_rep, df = df)
-  )
-  y_rep <- as.vector(X_rep %*% beta_draw) + sqrt(var_draw) * eps
-
-  list(y = y_rep, X = matrix(X_rep, nrow = n_rep, ncol = p, dimnames = dimnames(X_rep)))
-}
-
-run_bagged_pbppc_engines <- function(y_obs, X_obs,
-                                     fit_g_bagged,
-                                     fit_t_bagged,
-                                     fit_b_bagged = NULL,
-                                     fit_g_reference = NULL,
-                                     functional = c("chi2", "tail"),
-                                     df = 5,
-                                     q_tail = 0.995,
-                                     n_mc_pvalue = 100,
-                                     m_future_ppc = NULL,
-                                     p_value_type = NULL,
-                                     functional_restarts = 10,
-                                     parallel = FALSE,
-                                     n_cores = 1L,
-                                     seed = 4040) {
-  functional <- match.arg(functional)
-  n_obs <- length(y_obs)
-  if (is.null(m_future_ppc)) {
-    m_future_ppc <- 2L * n_obs
-  }
-  if (m_future_ppc < n_obs) {
-    stop("m_future_ppc must be at least n_obs.")
-  }
-
-  fun_obj <- build_pbppc_functional(
-    y_obs = y_obs,
-    X_obs = X_obs,
-    fit_g = fit_g_reference,
-    functional = functional,
-    df = df,
-    q_tail = q_tail,
-    functional_restarts = functional_restarts
-  )
-  if (is.null(p_value_type)) {
-    p_value_type <- fun_obj$p_value_type
-  }
-  S_obs <- fun_obj$S_obs
-  get_S <- fun_obj$eval_stat
-  include_bayes <- !is.null(fit_b_bagged)
-
-  one_rep <- function(b) {
-    dat_g <- generate_pseudo_sample_from_bagged_draws(
-      X_obs = X_obs,
-      beta_draws = fit_g_bagged$beta_draws,
-      var_draws = fit_g_bagged$var_draws,
-      n_rep = m_future_ppc,
-      error = "gaussian",
-      df = df,
-      seed = seed + 1000L + b
-    )
-    dat_t <- generate_pseudo_sample_from_bagged_draws(
-      X_obs = X_obs,
-      beta_draws = fit_t_bagged$beta_draws,
-      var_draws = fit_t_bagged$var_draws,
-      n_rep = m_future_ppc,
-      error = "student_t",
-      df = df,
-      seed = seed + 3000L + b
-    )
-
-    out <- list(
-      g_rep = get_S(dat_g$y[seq_len(n_obs)], dat_g$X[seq_len(n_obs), , drop = FALSE]),
-      g_center = get_S(c(y_obs, dat_g$y), rbind(X_obs, dat_g$X)),
-      t_rep = get_S(dat_t$y[seq_len(n_obs)], dat_t$X[seq_len(n_obs), , drop = FALSE]),
-      t_center = get_S(c(y_obs, dat_t$y), rbind(X_obs, dat_t$X))
-    )
-
-    if (include_bayes) {
-      dat_b <- generate_pseudo_sample_from_bagged_draws(
-        X_obs = X_obs,
-        beta_draws = fit_b_bagged$beta_draws,
-        var_draws = fit_b_bagged$var_draws,
-        n_rep = m_future_ppc,
-        error = "student_t",
-        df = df,
-        seed = seed + 5000L + b
-      )
-      out$b_rep <- get_S(dat_b$y[seq_len(n_obs)], dat_b$X[seq_len(n_obs), , drop = FALSE])
-      out$b_center <- get_S(c(y_obs, dat_b$y), rbind(X_obs, dat_b$X))
-    }
-
-    out
-  }
-
-  reps <- safe_mc_lapply(
-    X = seq_len(n_mc_pvalue),
-    FUN = one_rep,
-    n_cores = if (isTRUE(parallel)) n_cores else 1L
-  )
-
-  out_g <- pbppc_from_statistics(
-    S_obs = S_obs,
-    S_rep = vapply(reps, function(z) z$g_rep, numeric(1)),
-    S_center = vapply(reps, function(z) z$g_center, numeric(1)),
-    n_obs = n_obs,
-    model_label = fit_g_bagged$display_label,
-    functional_label = fun_obj$functional_label,
-    diagnostic_class = fun_obj$diagnostic_class,
-    p_value_type = p_value_type,
-    reference_label = fun_obj$reference_label,
-    n_mc_pvalue = n_mc_pvalue,
-    m_future_ppc = m_future_ppc
-  )
-  out_t <- pbppc_from_statistics(
-    S_obs = S_obs,
-    S_rep = vapply(reps, function(z) z$t_rep, numeric(1)),
-    S_center = vapply(reps, function(z) z$t_center, numeric(1)),
-    n_obs = n_obs,
-    model_label = fit_t_bagged$display_label,
-    functional_label = fun_obj$functional_label,
-    diagnostic_class = fun_obj$diagnostic_class,
-    p_value_type = p_value_type,
-    reference_label = fun_obj$reference_label,
-    n_mc_pvalue = n_mc_pvalue,
-    m_future_ppc = m_future_ppc
-  )
-
-  tab <- rbind(out_g$summary, out_t$summary)
-  out <- list(
-    functional = fun_obj$functional_label,
-    diagnostic_class = fun_obj$diagnostic_class,
-    reference = fun_obj$reference_label,
-    gaussian_mp = out_g,
-    t_mp = out_t,
-    bayes_t = NULL
-  )
-
-  if (include_bayes) {
-    out_b <- pbppc_from_statistics(
-      S_obs = S_obs,
-      S_rep = vapply(reps, function(z) z$b_rep, numeric(1)),
-      S_center = vapply(reps, function(z) z$b_center, numeric(1)),
-      n_obs = n_obs,
-      model_label = fit_b_bagged$display_label,
-      functional_label = fun_obj$functional_label,
-      diagnostic_class = fun_obj$diagnostic_class,
-      p_value_type = p_value_type,
-      reference_label = fun_obj$reference_label,
-      n_mc_pvalue = n_mc_pvalue,
-      m_future_ppc = m_future_ppc
-    )
-    out$bayes_t <- out_b
-    tab <- rbind(tab, out_b$summary)
-  }
-
-  rownames(tab) <- NULL
-  out$table <- tab
-  out
-}
-
-run_bagged_pbppc_suite_once <- function(standard_app, bagged_fits,
-                                        diagnostics = NULL,
-                                        df = 5,
-                                        q_tail = 0.995,
-                                        functional_restarts = 10,
-                                        parallel = FALSE,
-                                        n_cores = 1L,
-                                        seed0 = 4040) {
-  prep <- standard_app$prepared
-  y_obs <- prep$y
-  X_obs <- prep$X
-  if (is.null(diagnostics)) {
-    diagnostics <- default_aids_ppc_diagnostics(
-      n_obs = length(y_obs),
-      q_tail = q_tail
-    )
-  }
-
-  res_list <- vector("list", length(diagnostics))
-  tab_list <- vector("list", length(diagnostics))
-  for (j in seq_along(diagnostics)) {
-    spec <- diagnostics[[j]]
-    spec_full <- modifyList(
-      list(
-        y_obs = y_obs,
-        X_obs = X_obs,
-        fit_g_bagged = bagged_fits$gaussian,
-        fit_t_bagged = bagged_fits$student_t,
-        fit_b_bagged = bagged_fits$bayes,
-        fit_g_reference = standard_app$gaussian_hybrid,
-        df = df,
-        functional_restarts = functional_restarts,
-        parallel = parallel,
-        n_cores = n_cores,
-        seed = seed0 + 100000L * j
-      ),
-      spec
-    )
-    res_j <- do.call(run_bagged_pbppc_engines, spec_full)
-    res_list[[j]] <- res_j
-    tab_j <- res_j$table
-    tab_j$diagnostic_id <- j
-    tab_list[[j]] <- tab_j
-  }
-
-  table_all <- do.call(rbind, tab_list)
-  rownames(table_all) <- NULL
-  list(results = res_list, table = table_all, diagnostics = diagnostics)
-}
-
-make_bagged_ppc_summary_table <- function(tab) {
-  keep <- tab[, c("diagnostic_class", "model", "p_value", "delta_mean", "delta_sd")]
-  chi <- keep[keep$diagnostic_class == "chi_square_discrepancy", , drop = FALSE]
-  tail <- keep[keep$diagnostic_class == "absolute_residual_tail", , drop = FALSE]
-
-  model_map <- data.frame(
-    model = c("DB-MGP-Gaussian-hybrid", "DB-MGP-Student-t-hybrid", "DB-Bayes-Student-t"),
-    Model = c("bGPE", "bTPE", "bBTPE"),
-    stringsAsFactors = FALSE
-  )
-  model_map <- model_map[model_map$model %in% unique(keep$model), , drop = FALSE]
-
-  out <- data.frame(
-    Model = model_map$Model,
-    S_chi2_p_value = NA_real_,
-    S_chi2_AvgDiff = NA_real_,
-    S_chi2_StdDiff = NA_real_,
-    S_tail_p_value = NA_real_,
-    S_tail_AvgDiff = NA_real_,
-    S_tail_StdDiff = NA_real_,
-    row.names = NULL
-  )
-
-  for (i in seq_len(nrow(model_map))) {
-    chi_i <- chi[chi$model == model_map$model[i], , drop = FALSE]
-    tail_i <- tail[tail$model == model_map$model[i], , drop = FALSE]
-    if (nrow(chi_i) != 1L || nrow(tail_i) != 1L) {
-      stop("Could not construct the bagged PPC summary row for model: ", model_map$model[i])
-    }
-    out$S_chi2_p_value[i] <- chi_i$p_value
-    out$S_chi2_AvgDiff[i] <- chi_i$delta_mean
-    out$S_chi2_StdDiff[i] <- chi_i$delta_sd
-    out$S_tail_p_value[i] <- tail_i$p_value
-    out$S_tail_AvgDiff[i] <- tail_i$delta_mean
-    out$S_tail_StdDiff[i] <- tail_i$delta_sd
-  }
-
-  out
-}
-
-plot_bagged_ppc_stat_density <- function(S_obs, S_list, labels,
-                                         main = "",
-                                         xlab = "replicate statistic") {
-  values <- c(S_obs, unlist(S_list, use.names = FALSE))
-  rng <- range(values)
-  densities <- lapply(S_list, function(z) density(z, from = rng[1], to = rng[2]))
-  ymax <- max(vapply(densities, function(z) max(z$y), numeric(1)))
-  ltys <- seq_along(S_list)
-
-  plot(
-    densities[[1]],
-    xlim = rng,
-    ylim = c(0, ymax),
-    lty = ltys[1],
-    lwd = 2,
-    main = if (is.null(main)) "" else main,
-    xlab = xlab,
-    ylab = "Density"
-  )
-  if (length(densities) > 1L) {
-    for (i in 2:length(densities)) {
-      lines(densities[[i]], lty = ltys[i], lwd = 2)
-    }
-  }
-  abline(v = S_obs, lty = 2, lwd = 2)
-  legend(
-    "topright",
-    legend = c(labels, "Observed"),
-    lty = c(ltys, 2),
-    lwd = 2,
-    bty = "n"
-  )
-}
-
-save_bagged_ppc_density_figure <- function(bagged_ppc,
-                                           figure_dir,
-                                           save_png = TRUE) {
-  dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
-  chi2_res <- find_ppc_result_by_class(bagged_ppc, "chi_square_discrepancy")
-  tail_res <- find_ppc_result_by_class(bagged_ppc, "absolute_residual_tail")
-  include_bayes <- !is.null(tail_res$bayes_t)
-  labels <- if (include_bayes) c("bGPE", "bTPE", "bBTPE") else c("bGPE", "bTPE")
-
-  collect_reps <- function(res) {
-    vals <- list(res$gaussian_mp$S_rep, res$t_mp$S_rep)
-    if (!is.null(res$bayes_t)) {
-      vals[[length(vals) + 1L]] <- res$bayes_t$S_rep
-    }
-    vals
-  }
-
-  save_plot_multi(
-    plot_fun = function() {
-      oldpar <- par(no.readonly = TRUE)
-      on.exit(par(oldpar), add = TRUE)
-      par(
-        mfrow = c(1, 2),
-        mar = c(4, 4, 1, 1),
-        oma = c(0, 0, 0, 0),
-        cex = 1.2,
-        cex.lab = 1.2,
-        cex.axis = 1.1
-      )
-      plot_bagged_ppc_stat_density(
-        S_obs = tail_res$gaussian_mp$S_obs,
-        S_list = collect_reps(tail_res),
-        labels = labels,
-        xlab = expression(S[tail])
-      )
-      plot_bagged_ppc_stat_density(
-        S_obs = chi2_res$gaussian_mp$S_obs,
-        S_list = collect_reps(chi2_res),
-        labels = labels,
-        xlab = expression(S[chi^2])
-      )
-    },
-    stem = "double_bootstrap_ppc_replicate_density_two_panel",
-    figure_dir = figure_dir,
-    width = 12,
-    height = 5,
-    save_png = save_png,
-    aliases = c("double_bootstrap_ppc_pe_density_two_panel")
-  )
-
-  invisible(TRUE)
-}
-
-save_bagged_ppc_outputs <- function(bagged_ppc,
-                                    bagged_ppc_table_paper,
-                                    bagged_ppc_summary,
-                                    output_dir,
-                                    save_png = TRUE) {
-  write.csv(
-    bagged_ppc$table,
-    file = file.path(output_dir, "double_bootstrap_ppc_single_table_raw.csv"),
-    row.names = FALSE
-  )
-  write.csv(
-    bagged_ppc_table_paper,
-    file = file.path(output_dir, "double_bootstrap_ppc_single_table_paper.csv"),
-    row.names = FALSE
-  )
-  write.csv(
-    bagged_ppc_summary,
-    file = file.path(output_dir, "double_bootstrap_ppc_pe_summary.csv"),
-    row.names = FALSE
-  )
-  writeLines(
-    make_ppc_summary_latex(
-      bagged_ppc_summary,
-      caption = paste(
-        "Double-bootstrap PPC-PE results by model. bGPE and bTPE denote",
-        "bagged predictive engines based on Gaussian and Student-t regression models,",
-        "respectively; bBTPE denotes the bagged Bayes posterior predictive engine."
-      ),
-      label = "tab:double-bootstrap-ppc-pe-aids"
-    ),
-    con = file.path(output_dir, "double_bootstrap_ppc_pe_summary.tex")
-  )
-  save_bagged_ppc_density_figure(
-    bagged_ppc = bagged_ppc,
-    figure_dir = file.path(output_dir, "figures"),
-    save_png = save_png
-  )
-  invisible(TRUE)
-}
-
-setting_value <- function(settings, field, default = NA_character_) {
-  if (is.null(settings) || !(field %in% settings$field)) {
-    return(default)
-  }
-  settings$value[match(field, settings$field)]
-}
-
-add_bagged_ppc_to_saved_double_bootstrap_results <- function(
-    results_file = file.path("double_bootstrap_results", "aids_double_bootstrap_calibration.rds"),
-    output_dir = dirname(results_file),
-    q_tail = 0.995,
-    df_model = NULL,
-    functional_restarts = NULL,
-    parallel = FALSE,
-    n_cores = recommended_ppc_cores(4L),
-    seed0 = 42026,
-    save_png = TRUE) {
-  if (!file.exists(results_file)) {
-    stop("Double-bootstrap results not found: ", results_file)
-  }
-
-  out <- readRDS(results_file)
-  if (is.null(df_model)) {
-    df_model <- as.numeric(setting_value(out$settings, "df_student_t", "5"))
-  }
-  if (is.null(functional_restarts)) {
-    functional_restarts <- as.integer(setting_value(out$settings, "n_restart_boot", "10"))
-  }
-
-  n <- out$standard_app$prepared$n_obs
-  bagged_ppc <- run_bagged_pbppc_suite_once(
-    standard_app = out$standard_app,
-    bagged_fits = out$bagged_fits,
-    diagnostics = default_aids_ppc_diagnostics(n_obs = n, q_tail = q_tail),
-    df = df_model,
-    q_tail = q_tail,
-    functional_restarts = functional_restarts,
-    parallel = parallel,
-    n_cores = n_cores,
-    seed0 = seed0
-  )
-  bagged_ppc_table_paper <- format_ppc_table_for_paper(bagged_ppc$table)
-  bagged_ppc_summary <- make_bagged_ppc_summary_table(bagged_ppc$table)
-
-  out$bagged_ppc <- bagged_ppc
-  out$bagged_ppc_table_paper <- bagged_ppc_table_paper
-  out$bagged_ppc_summary <- bagged_ppc_summary
-  saveRDS(out, file = results_file)
-  save_bagged_ppc_outputs(
-    bagged_ppc = bagged_ppc,
-    bagged_ppc_table_paper = bagged_ppc_table_paper,
-    bagged_ppc_summary = bagged_ppc_summary,
-    output_dir = output_dir,
-    save_png = save_png
-  )
-
-  invisible(out)
-}
-
 run_aids_double_bootstrap_calibration <- function(
     standard_results_file = file.path("application_results", "aids_application_results.rds"),
     output_dir = "double_bootstrap_results",
@@ -1004,17 +549,13 @@ run_aids_double_bootstrap_calibration <- function(
     bayes_chains_boot = 1,
     bayes_parallel_chains_boot = 1,
     parallel = FALSE,
-    n_cores = recommended_ppc_cores(4L),
+    n_cores = recommended_n_cores(4L),
     mc_preschedule = FALSE,
-    compute_bagged_ppc = TRUE,
-    bagged_ppc_parallel = FALSE,
-    bagged_ppc_n_cores = recommended_ppc_cores(4L),
-    bagged_ppc_seed = 42026,
     seed = 92025) {
   if (!file.exists(standard_results_file)) {
     stop(
       "Standard application results not found: ", standard_results_file,
-      ". Run Rscript run.R first, or pass a valid standard_results_file."
+      ". Run Rscript Run_Empirical_ACTG175.R first, or pass a valid standard_results_file."
     )
   }
 
@@ -1098,25 +639,6 @@ run_aids_double_bootstrap_calibration <- function(
     rownames(coefficient_comparison_table) <- NULL
   }
 
-  bagged_ppc <- NULL
-  bagged_ppc_table_paper <- NULL
-  bagged_ppc_summary <- NULL
-  if (isTRUE(compute_bagged_ppc)) {
-    bagged_ppc <- run_bagged_pbppc_suite_once(
-      standard_app = standard_app,
-      bagged_fits = bagged_fits,
-      diagnostics = default_aids_ppc_diagnostics(n_obs = n, q_tail = 0.995),
-      df = df_model,
-      q_tail = 0.995,
-      functional_restarts = n_restart_boot,
-      parallel = bagged_ppc_parallel,
-      n_cores = bagged_ppc_n_cores,
-      seed0 = bagged_ppc_seed
-    )
-    bagged_ppc_table_paper <- format_ppc_table_for_paper(bagged_ppc$table)
-    bagged_ppc_summary <- make_bagged_ppc_summary_table(bagged_ppc$table)
-  }
-
   settings <- data.frame(
     field = c(
       "method",
@@ -1133,10 +655,6 @@ run_aids_double_bootstrap_calibration <- function(
       "parallel",
       "n_cores",
       "mc_preschedule",
-      "compute_bagged_ppc",
-      "bagged_ppc_parallel",
-      "bagged_ppc_n_cores",
-      "bagged_ppc_seed",
       "seed"
     ),
     value = c(
@@ -1154,10 +672,6 @@ run_aids_double_bootstrap_calibration <- function(
       as.character(parallel),
       as.character(if (isTRUE(parallel)) n_cores else 1L),
       as.character(mc_preschedule),
-      as.character(compute_bagged_ppc),
-      as.character(bagged_ppc_parallel),
-      as.character(if (isTRUE(bagged_ppc_parallel)) bagged_ppc_n_cores else 1L),
-      as.character(bagged_ppc_seed),
       as.character(seed)
     ),
     stringsAsFactors = FALSE
@@ -1171,10 +685,7 @@ run_aids_double_bootstrap_calibration <- function(
     variance_components = variance_components,
     coefficient_table = coefficient_table,
     coefficient_table_paper = coefficient_table_paper,
-    coefficient_comparison_table = coefficient_comparison_table,
-    bagged_ppc = bagged_ppc,
-    bagged_ppc_table_paper = bagged_ppc_table_paper,
-    bagged_ppc_summary = bagged_ppc_summary
+    coefficient_comparison_table = coefficient_comparison_table
   )
 
   saveRDS(out, file = file.path(output_dir, "aids_double_bootstrap_calibration.rds"))
@@ -1196,16 +707,6 @@ run_aids_double_bootstrap_calibration <- function(
       row.names = FALSE
     )
   }
-  if (!is.null(bagged_ppc)) {
-    save_bagged_ppc_outputs(
-      bagged_ppc = bagged_ppc,
-      bagged_ppc_table_paper = bagged_ppc_table_paper,
-      bagged_ppc_summary = bagged_ppc_summary,
-      output_dir = output_dir,
-      save_png = TRUE
-    )
-  }
-
   save_double_bootstrap_contours(
     standard_app = standard_app,
     bagged_fits = bagged_fits,

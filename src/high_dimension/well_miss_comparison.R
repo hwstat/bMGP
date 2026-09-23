@@ -118,7 +118,10 @@ comparison_variant_config <- function(config, model_id) {
     n_boot = n_boot,
     paths_per_boot = paths_per_boot,
     B = family_int(config, family, "B", n_boot * paths_per_boot),
-    T = family_int(config, family, "T", defaults$T),
+    ## Student-t paths run for p + 100 steps (300 at p = 200, 400 at p = 300),
+    ## the truncation used with kappa = 10; the linear default is the profile T.
+    T = family_int(config, family, "T",
+                   if (identical(family, "studentt")) p + 100L else defaults$T),
     n = family_int(config, family, "n", defaults$n),
     p = p,
     p_star = p_star,
@@ -161,7 +164,9 @@ comparison_variant_config <- function(config, model_id) {
       beta_scale = family_num(config, family, "beta_scale", 3),
       active_ratio = p_star / p,
       v1 = family_num(config, family, "v1", 9),
-      w = family_num(config, family, "w", p_star / p),
+      ## The paper fixes the inclusion probability at 0.25 for both p = 200
+      ## and p = 300 (Appendix A.2.4); it is not tied to p_star / p.
+      w = family_num(config, family, "w", 0.25),
       v0_grid = family_text(
         config, family, "v0_grid",
         "1,0.5,0.1,0.05,0.01,0.005,0.001,0.0005"

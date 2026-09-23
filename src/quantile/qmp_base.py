@@ -15,8 +15,8 @@ from scipy.stats import norm, gamma
 import qmp.qmp_functions as qmp
 import qmp.sample_qmp_functions as sqmp
 
-TARGET_Q = 0.95         # Table 2 / bPBP comparison focuses on the upper quantile.
-INTERVAL_LEVEL = 0.95   # 后验区间仍然用 95%
+TARGET_Q = 0.95         # the tail experiment (Appendix B.3) focuses on the upper quantile.
+INTERVAL_LEVEL = 0.95   # credible intervals are reported at the 95% level
 
 DU = 0.005
 U_GRID = np.arange(DU, 1.0, DU, dtype=np.float32)

@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 ## Table 1: Monte Carlo coverage for the population mean, MGP vs bMGP, under the
 ## fixed-variance Gaussian predictive engine with varkappa = 1/2 (Section 3.2 of the paper).
-## Usage: Rscript Run_Table1_Mean_Coverage.R [--R=200 --ncores=10 --n_grid=100,200,500]
+## Usage: Rscript Run_Table1_Mean_Coverage.R [--R=200 --ncores=8 --n_grid=100,200,500]
+## The per-worker random-number streams depend on --ncores; the paper's numbers use --ncores=8.
 ## The engine draws with the fixed variance var(x)/2 (the paper design);
 ## --fixed_var=false updates the variance along the path instead.
 
@@ -647,7 +648,7 @@ main <- function() {
   cli <- parse_cli(commandArgs(trailingOnly = TRUE))
 
   R <- as.integer(cli_value(cli, "R", 200))
-  if (identical(tolower(cli_value(cli, "fixed_var", "true")), "true")) Sys.setenv(GPE_FIXED_VAR = "1")
+  if (cli_flag(cli, "fixed_var", TRUE)) Sys.setenv(GPE_FIXED_VAR = "1")
   n_grid <- cli_num(cli, "n_grid", c(100, 200, 500))
   cases <- strsplit(cli_value(cli, "cases", "Well_Normal,Miss_Gamma"), ",")[[1]]
   S_ord <- as.integer(cli_value(cli, "S_ord", 1000))
