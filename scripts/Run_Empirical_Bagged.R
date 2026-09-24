@@ -1,4 +1,4 @@
-## ACTG175 bagged calibration (Section 4.4): B = 50 bootstrap data sets, each
+## ACTG175 bagged calibration (Section 4.1.3): B = 50 bootstrap data sets, each
 ## engine refitted per bag (one CmdStan fit per bag for BTPE); writes
 ## double_bootstrap_results/. Needs Run_Empirical_ACTG175.R results first.
 ## Usage: Rscript Run_Empirical_Bagged.R

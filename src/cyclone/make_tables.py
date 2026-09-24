@@ -118,7 +118,7 @@ def main():
         r"quantiles of lifetime maximum wind speed on the $n=291$ North Atlantic",
         r"cyclone records of \citet{elsner2008increasing}, on a single",
         r"Apple M4 Pro (14 cores, 48\,GB), with BLAS threads pinned to one. Each",
-        r"method was run twice; both runs and their mean are reported. QMP-GP is",
+        r"method was run twice; both runs are reported. QMP-GP is",
         r"the Gaussian process approximation of \citet{fong2025bayesian}",
         r"(their Algorithm 7) in place of the exact predictive resampler. DQP is",
         r"the dependent quantile pyramid of \citet{an2024process}, run with the",
@@ -132,11 +132,11 @@ def main():
     ]
     tex_labels = {
         "qmp_B10000": r"QMP, $M=10{,}000$ paths",
-        "bqmp_50x20": r"bagged QMP, $B=50$, $M_B=20$",
+        "bqmp_50x20": r"Bagged QMP, $B=50$, $M_B=20$",
         "qmp_B1000": r"QMP, $M=1000$ paths",
         "qmpgp_B10000": r"QMP-GP, $M=10{,}000$ draws",
-        "bqmpgp_50x20": r"bagged QMP-GP, $B=50$, $M_B=20$",
-        "dqp_20000": r"DQP, $20{,}000$ MCMC iterations",
+        "bqmpgp_50x20": r"Bagged QMP-GP, $B=50$, $M_B=20$",
+        "dqp_20000": r"DQP, $20{,}000$ iterations",
     }
     for _, r in out.iterrows():
         tex.append(

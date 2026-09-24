@@ -509,7 +509,7 @@ run_mean_pbi_dbgrid_matched_original <- function(
 }
 
 CASE_LABELS <- c(
-  Well_Normal = "DGP: $N(0,1)$",
+  Well_Normal = "DGP: $\\mathcal{N}(0,1)$",
   Miss_Gamma  = "DGP: $\\mathrm{Ga}(2,2)$"
 )
 CASE_LABELS_PLAIN <- c(

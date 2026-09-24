@@ -29,7 +29,7 @@ WmaxST, in the original units of both variables.
       the line is fitted against the raw years, so those slopes are already in
       WmaxST units per year.
 
-The two GP rows are the Gaussian process approximation of Algorithm 5 in place
+The two GP rows are the Gaussian process approximation of Algorithm 7 in place
 of the exact predictive resampler: QMP-GP is the beta_gp array that
 posterior_qmp.py already saves (seed 5124), and bagged QMP-GP is the pooled
 array from posterior_bqmp.py --sampler gp. Either is skipped if its file is not

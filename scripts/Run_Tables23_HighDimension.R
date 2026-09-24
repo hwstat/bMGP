@@ -25,8 +25,8 @@ EXAMPLE_LABELS <- list(
   studentt = c(ridge = "Student-$t$ ridge", sas = "Student-$t$ spike")
 )
 METHOD_LABELS <- c(PBP = "MGP", bPBP = "bMGP")
-DGP_HEADERS <- c(well = "\\emph{Well-specified DGP}",
-                 miss = "\\emph{Misspecified DGP}")
+DGP_HEADERS <- c(well = "\\textit{Homoskedastic ($m=0$)}",
+                 miss = "\\textit{Heteroskedastic ($m=4$)}")
 PRIOR_ORDER <- c("ridge", "sas")
 METHOD_ORDER <- c("PBP", "bPBP")
 DGP_ORDER <- c("well", "miss")

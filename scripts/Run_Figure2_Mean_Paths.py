@@ -13,7 +13,7 @@ FIXED_VARIANCE = False
 
 SCENARIOS = ("well", "miss")
 SCENARIO_TITLES = {
-    "well": r"DGP: $N(0,1)$",
+    "well": r"DGP: $\mathcal{N}(0,1)$",
     "miss": r"DGP: $\mathrm{Ga}(2,2)$",
 }
 

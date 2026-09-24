@@ -20,7 +20,7 @@ cd scripts
 | Figure 2 | `python Run_Figure2_Mean_Paths.py` |
 | Tables 2 and 3, MGP and bMGP rows; Tables 7 and 8 with `--p=300` (the inclusion probability stays at 0.25 and the Student-t horizon becomes p + 100 = 400, as in the paper) | `Rscript Run_Tables23_HighDimension.R` |
 | Tables 2 and 7, Bayes and BayesBag rows (both dimensions by default; `--p=200` for Table 2 alone, `--p=300` for Table 7 alone) | `Rscript Run_Table2_Bayes_BayesBag.R`, then `Rscript Make_Table2_Bayes_BayesBag.R` |
-| Footnote of Table 2 (50 draws per bagged data set) | `Rscript Run_Table2_Bayes_BayesBag.R --draws_per_boot=50 --out=output/table2_draws50` |
+| Footnote 4, Section 4.1.1 (50 draws per bagged data set) | `Rscript Run_Table2_Bayes_BayesBag.R --draws_per_boot=50 --out=output/table2_draws50` |
 | Ridge timings quoted in Appendix A.3.1 | `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 Rscript Run_Table2_Bayes_BayesBag.R --mode=timing --methods=bayes,bayesbag,mgp,bmgp --workers=1 --parallel=false` (the thread variables must be set before R starts) |
 | Tables 4 and 5 (q = 0.5, 0.75 at n = 100, 200, 500; for the q = 0.75 rows at n = 1000, 2000 add `--n-grid 1000 2000`) | `python Run_Quantile_Tables.py` |
 | Table 10 (q = 0.95 against the population quantile, n = 100, 200, 500; several hours) | `python Run_Quantile_Tail_Table.py` |
@@ -35,7 +35,7 @@ Scripts are independent of one another except the empirical pipeline (last row),
 
 ## Dependencies
 
-- **R**: `MASS`, `Matrix`; plus `cmdstanr` + `posterior` (empirical application), `ggplot2` (Figure 1 and the empirical application), `ggdist`, `scales` (Figure 1), and `Rcpp`, `RcppArmadillo`, `jsonlite` (the DQP chain of Tables 11–12, whose C++ sources are compiled at run time)
-- **Python** ≥ 3.9: `numpy`; plus `scipy`, `pandas`, `jax` (quantile sweep); the cyclone scripts of Tables 11–12 also need `scikit-learn` (for `LinearRegression` only) and the vendored `qmp` package in `src/quantile/qmp/`, and were run with the versions pinned in that package's upstream `setup.py`, `jax` 0.4.30 with the CPU `jaxlib` 0.4.30, `numpy` 1.26.4 and `scipy` 1.12.0
+- **R**: `MASS`, `Matrix`; plus `cmdstanr` + `posterior` (empirical application), `ggplot2` (Figure 1 and the empirical application), `ggdist`, `scales` (Figure 1), and `Rcpp`, `RcppArmadillo`, `jsonlite` (the DQP chain of Tables 6, 11 and 12, whose C++ sources are compiled at run time)
+- **Python** ≥ 3.9: `numpy`; plus `scipy`, `pandas`, `jax` (quantile sweep); the cyclone scripts of Tables 6, 11 and 12 also need `scikit-learn` (for `LinearRegression` only) and the vendored `qmp` package in `src/quantile/qmp/`, and were run with the versions pinned in that package's upstream `setup.py`, `jax` 0.4.30 with the CPU `jaxlib` 0.4.30, `numpy` 1.26.4 and `scipy` 1.12.0
 
 `src/quantile/qmp/` and `src/cyclone/dqp/` are vendored third-party code, under the MIT licences in `src/quantile/qmp/LICENSE` (Edwin Fong) and `src/cyclone/dqp/LICENSE` (Hyoin An).

@@ -24,7 +24,7 @@ Two methods, chosen with --method:
                    pipeline is fit + exact.
   gp               method "QMP-GP". Times the fit, then approx_PR_reg_B
                    only, and reports fit + gp as the pipeline. This is the
-                   Gaussian process approximation of Algorithm 5 costed as
+                   Gaussian process approximation of Algorithm 7 costed as
                    a method in its own right rather than as a field on the
                    exact row.
 

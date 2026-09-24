@@ -1,4 +1,4 @@
-## ACTG175 application, standard fits (Section 4.4): GPE, TPE and BTPE engines
+## ACTG175 application, standard fits (Section 4.1.3): GPE, TPE and BTPE engines
 ## on data/AIDS.csv; writes application_results/. Run from scripts/.
 ## Usage: Rscript Run_Empirical_ACTG175.R
 safe_solve <- function(A, ridge = 1e-8) {

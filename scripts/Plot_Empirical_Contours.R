@@ -24,7 +24,7 @@ OPTS <- list(
   frame_colour = "#4D4D4D",
   grid_colour  = "#E8E8E8",
 
-  shared_limits = TRUE,  # one window for all engines -- see README
+  shared_limits = TRUE,  # one axis window shared by all three engines
   equal_aspect = TRUE,   # beta_2 and beta_3 are the same kind of quantity, so
   panel_w_cm = 4.31,     # -> ~15.6 cm total, the paper's common figure width
   panel_h_cm = 3.70,     # only used when equal_aspect = FALSE
